@@ -1,0 +1,199 @@
+#!/bin/bash
+Version=2.01
+ Myname="${0##*/}"
+
+:<<'DOC'
+= reorder - reorder columns in a file
+
+= Synopsis
+reorder [options] --fields=list [file]	
+
+== Options
+-h|--help	print short help and exit
+-H|--Help	print full documentation and exit
+-V|--version	print version and exit
+-f|--fields	ordered list of comma-separated field(range)s
+-s|--squeeze	squeeze off trailing empty fields
+-t|--tab	column separator; default is the tab character
+-u|--undefined	contents for undefined fields; default: empty
+-i|--inplace	change file inplace
+
+= Description
+reorder reorders the columns in a file (standard input by default) according to
+the list of comma-separated field numbers and/or field ranges given, where a
+field range is two numbers separated with a hyphen. Reverse ranges are allowed.
+
+By default, columns are separated by tabs, unless a different separator is
+specified with the |--tab| option. Columns are counted starting at 1. Ranges of
+columns may be specified with hyphens.
+
+Unavailable columns are replaced with empty ones or, if the |--undefined| option
+is used, with that options' argument. So if you specify the fifth column in a
+2-column file, you end up with a 5-column file.
+
+Output is written to standard output, unless the the |--inplace| option is used,
+which causes the output to be written to the original file.
+
+= Examples
+Switch the second and third columns in a tab-separated file:
+
+        reorder --fields=1,3,2 file
+
+Reverse the three columns of a space-separated file:
+
+        reorder -t' ' -f3-1 file
+
+Move columns 7 through 9 after the last column in an 11-column
+tab-separated file:
+
+        reorder -f1-6,10,11,7-9 file
+
+Put two empty columns between the columns of a 2-column file:
+
+        reorder -f1,3,4,2 file
+
+Insert an empty column before the first in a file with a variable number
+of columns, with a maximum of 12, say:
+
+        reorder -f20,1-12 file
+
+This will result in a 13-column file with trailing empty fields!
+
+The same, but replace undefined fields with '-' and remove trailing empty
+fields, and replace the original file with the output:
+
+        reorder -siu- -f20,1-12 file
+
+= Author
+[Wybo Dekker](wybo@dekkerdocumenten.nl)
+
+= Copyright
+Released under the [GNU General Public License](www.gnu.org/copyleft/gpl.html)
+DOC
+
+REd='\e[38;5;9m'
+    die() { local i; for i; do echo -e "$Myname: $REd$i"; done 1>&2; exit 1; }
+helpsrt() { sed -n '/^= Synopsis/,/^= /p' "$0"|sed '1d;$d'; exit; }
+helpall() { sed -n "/^:<<'DOC'$/,/^DOC/p" "$0"|sed '1d;$d'|
+            less -P"$Myname-${Version/./·} (press h for help, q to quit)";exit; }
+
+:<<'DOC' #----------------------------------------------------------------------
+= handle_options
+synopsis:	 handle_options "$@"
+description:	handle the options.
+globals used:	 Myname Version
+globals  set:	 args
+DOC
+#-------------------------------------------------------------------------------
+handle_options() {
+   local options
+   options=$(getopt \
+      -n "$Myname" \
+      -o hHVIst:u:if: \
+      -l help,Help,version,squeeze,tab:,undefined:,inplace,fields: \
+      -- "$@"
+   ) || exit 1
+   eval set -- "$options"
+   sep=$'\t' inplace=false undef='' squeeze=false
+   while [ $# -gt 0 ]; do
+      case $1 in
+      (-h|--help)       # print short help and exit
+			helpsrt
+			;;
+      (-H|--Help)       # print full documentation and exit
+			helpall
+			;;
+      (-V|--version)    # print version and exit
+			echo $Version
+			exit
+			;;
+      (-f|--fields)     # ordered list of comma-separated field(range)s
+			fields="$2"
+			shift 2
+			;;
+      (-s|--squeeze)    # squeeze off trailing empty fields
+			squeeze=true
+			shift
+			;;
+      (-t|--tab)        # column separator; default is the tab character
+			sep="$2"
+			[[ ${#sep} == 1 ]] ||
+			die "--tab option: column separator must be one single character"
+			shift 2
+			;;
+      (-u|--undefined)  # contents for undefined fields; default: empty
+			undef="$2"
+			shift 2
+			;;
+      (-i|--inplace)    # change file inplace
+			inplace=true
+			shift
+			;;
+      (-I)              instscript "$0" ||
+			   die 'the -I option is for developers only'
+			exit
+			;;
+      (--)              shift
+			break
+			;;
+      (*)               break
+			;;
+      esac
+   done
+   args=( "$@" )
+}
+
+handle_options "$@"
+set -- "${args[@]}"
+
+[[ -z $fields  ]] && die 'you must use the --fields option'
+case $# in
+(0) $inplace && die "you may not use the --inplace option on standard input"
+    file=$(mktemp -t "$Myname.XXXXXXXXXX")
+    trap 'rm -f "$file"' 0 1 2 15
+    cat >"$file"
+    ;;
+(1) file="$1"
+    ;;
+(*) die "too many arguments"
+esac 
+cols=()
+list=$(sed -e '
+  s/,/ /g
+  s/\([0-9]\+\)-\([0-9]\+\)/{\1..\2}/g
+' <<<"$fields")
+list=$(eval "echo $list")
+[[ $list =~ - ]] && die "open ranges like n- or -n are not allowed"
+
+for i in $list; do
+   [[ $i =~ ^[1-9][0-9]*$ ]] || die "illegal column number «$i»"
+   (( j=i-1 ))
+   cols+=( "$j" )
+done
+[[ ${#cols[@]} == 0 ]] && die "I need at least one column number"
+
+tmp=$(mktemp -t "$Myname.XXXXXXXXXX")
+trap 'rm -f "$tmp"' 0 1 2 15
+
+while IFS=$'\2' read -ra x; do 
+   z=''
+   (( n=${#x[@]}-1 ))
+   for i in "${cols[@]}"; do 
+      if (( i>n )) ; then p="$undef"; else p="${x[$i]}"; fi
+      z+="$p$sep"
+   done
+   printf '%s\n' "${z%$sep}" >> "$tmp"
+done < <(sed -e "s/$sep$/$sep$sep/" < "$file" | tr "$sep" '\2')
+#        ^^^ if a row ends with a separator, we want that to mean that it ends
+#        with an empty field, not with an undefined field. Since the read
+#        function discards a final IFS, we double it here.
+
+if $squeeze; then 
+   sed -i -e "s/$sep\\+$//" "$tmp"
+fi
+
+if $inplace; then
+   mv -f "$tmp" "$file" 
+else 
+   cat "$tmp"
+fi
