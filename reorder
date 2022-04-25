@@ -9,14 +9,15 @@ Version=2.01
 reorder [options] --fields=list [file]	
 
 == Options
--h|--help	print short help and exit
--H|--Help	print full documentation and exit
--V|--version	print version and exit
--f|--fields	ordered list of comma-separated field(range)s
--s|--squeeze	squeeze off trailing empty fields
--t|--tab	column separator; default is the tab character
--u|--undefined	contents for undefined fields; default: empty
--i|--inplace	change file inplace
+-h,--help	print short help and exit
+-H,--Help	print full documentation and exit
+-V,--version	print version and exit
+-f,--fields=X	set list of list of comma-separated field(range)s to X
+-s,--squeeze	squeeze off trailing empty fields
+-t,--tab=X	set column separator to X; default: the tab character
+-u,--undefined=X	set contents for undefined fields to X; default: empty
+-i,--inplace	change file inplace
+
 
 = Description
 reorder reorders the columns in a file (standard input by default) according to
@@ -107,7 +108,7 @@ handle_options() {
 			echo $Version
 			exit
 			;;
-      (-f|--fields)     # ordered list of comma-separated field(range)s
+      (-f|--fields)     # set list of list of comma-separated field(range)s to X
 			fields="$2"
 			shift 2
 			;;
@@ -115,13 +116,13 @@ handle_options() {
 			squeeze=true
 			shift
 			;;
-      (-t|--tab)        # column separator; default is the tab character
+      (-t|--tab)        # set column separator to X; default: the tab character
 			sep="$2"
 			[[ ${#sep} == 1 ]] ||
 			die "--tab option: column separator must be one single character"
 			shift 2
 			;;
-      (-u|--undefined)  # contents for undefined fields; default: empty
+      (-u|--undefined)  # set contents for undefined fields to X; default: empty
 			undef="$2"
 			shift 2
 			;;
