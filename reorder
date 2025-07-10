@@ -66,7 +66,7 @@ fields, and replace the original file with the output:
         reorder -siu- -f20,1-12 file
 
 = Author
-[Wybo Dekker](wybo@dekkerdocumenten.nl)
+[Wybo Dekker](wybodekker@me.com)
 
 = Copyright
 Released under the [GNU General Public License](www.gnu.org/copyleft/gpl.html)
